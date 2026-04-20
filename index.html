@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Apex Mechatronics Dashboard</title>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<!-- Chart.js for graph -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial;
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+  color: white;
+  text-align: center;
+}
+
+/* LOGIN BOX */
+#loginBox {
+  margin-top: 120px;
+}
+
+input {
+  padding: 10px;
+  margin: 5px;
+  width: 200px;
+  border-radius: 8px;
+  border: none;
+}
+
+button {
+  padding: 10px 20px;
+  margin-top: 10px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #00c6ff;
+  color: white;
+}
+
+/* DASHBOARD */
+#dashboard {
+  display: none;
+  padding: 20px;
+}
+
+.card {
+  background: rgba(255,255,255,0.1);
+  padding: 20px;
+  border-radius: 15px;
+  width: 300px;
+  margin: auto;
+  margin-top: 20px;
+}
+
+.temp {
+  font-size: 50px;
+  font-weight: bold;
+}
+
+.cold { color: #00c6ff; }
+.normal { color: #00ff88; }
+.hot { color: #ff4d4d; }
+
+canvas {
+  margin-top: 30px;
+  background: white;
+  border-radius: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div id="loginBox">
+  <h2>Login - Apex Mechatronics</h2>
+  <input type="email" id="email" placeholder="Email"><br>
+  <input type="password" id="password" placeholder="Password"><br>
+  <button onclick="login()">Login</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <h1>Live Temperature Dashboard</h1>
+
+  <div class="card">
+    <h3>🌡 Temperature</h3>
+    <div id="temp" class="temp">-- °C</div>
+  </div>
+
+  <button onclick="logout()">Logout</button>
+
+  <canvas id="chart" width="300" height="200"></canvas>
+</div>
+
+<script>
+// 🔥 FIREBASE CONFIG (REPLACE)
+const firebaseConfig = {
+  apiKey: "AIzaSyB9FzbgMs74UD6Q8ec5K0aw8NXGdyP8K_Y",
+  authDomain: "esp32-temperature-1c801.firebaseapp.com",
+  databaseURL: "https://esp32-temperature-1c801-default-rtdb.firebaseio.com",
+  projectId: "esp32-temperature-1c801",
+  storageBucket: "esp32-temperature-1c801.firebasestorage.app",
+  messagingSenderId: "249574225489",
+  appId: "1:249574225489:web:c8061ffa928d8cba92aa70"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const auth = firebase.auth();
+const db = firebase.database();
+
+/* ================= LOGIN ================= */
+function login() {
+  let email = document.getElementById("email").value;
+  let pass = document.getElementById("password").value;
+
+  auth.signInWithEmailAndPassword(email, pass)
+    .then(() => {
+      document.getElementById("loginBox").style.display = "none";
+      document.getElementById("dashboard").style.display = "block";
+      startApp();
+    })
+    .catch(err => alert(err.message));
+}
+
+function logout() {
+  auth.signOut().then(() => location.reload());
+}
+
+/* ================= TEMP + GRAPH ================= */
+let chart;
+let tempData = [];
+let labels = [];
+
+function startApp() {
+  const ctx = document.getElementById("chart").getContext("2d");
+
+  chart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Temperature (°C)",
+        data: tempData,
+        borderColor: "red",
+        backgroundColor: "rgba(255,0,0,0.2)",
+        fill: true
+      }]
+    }
+  });
+
+  db.ref("temperature").on("value", snapshot => {
+    let temp = snapshot.val();
+
+    if (temp !== null) {
+      let t = parseFloat(temp);
+
+      // Display temp
+      let el = document.getElementById("temp");
+      el.innerText = t.toFixed(1) + " °C";
+
+      el.classList.remove("cold","normal","hot");
+
+      if (t < 20) el.classList.add("cold");
+      else if (t <= 30) el.classList.add("normal");
+      else el.classList.add("hot");
+
+      // Update graph
+      let time = new Date().toLocaleTimeString();
+
+      labels.push(time);
+      tempData.push(t);
+
+      if (labels.length > 10) {
+        labels.shift();
+        tempData.shift();
+      }
+
+      chart.update();
+    }
+  });
+}
+
+/* ================= AUTO LOGIN CHECK ================= */
+auth.onAuthStateChanged(user => {
+  if (user) {
+    document.getElementById("loginBox").style.display = "none";
+    document.getElementById("dashboard").style.display = "block";
+    startApp();
+  }
+});
+</script>
+
+</body>
+</html>
